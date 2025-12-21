@@ -29,7 +29,7 @@ public class CorsConfig implements WebMvcConfigurer {
         CorsConfiguration configuration = new CorsConfiguration();
         
         // Allow all origins (для разработки)
-        // В продакшене замените на конкретные домены:
+        // В продакшене заменить на конкретные домены:
         // configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "https://yourdomain.com"));
         configuration.setAllowedOriginPatterns(List.of("*"));
         

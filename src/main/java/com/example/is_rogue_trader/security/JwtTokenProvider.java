@@ -14,7 +14,7 @@ import java.util.function.Function;
 @Component
 public class JwtTokenProvider {
     
-    @Value("${jwt.secret:mySecretKeyForJWTTokenGenerationThatIsAtLeast256BitsLong}")
+    @Value("${jwt.secret}")
     private String jwtSecret;
     
     @Value("${jwt.expiration:86400000}") // 24 часа по умолчанию
