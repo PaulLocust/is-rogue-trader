@@ -27,10 +27,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-websocket")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-
-	// EclipseLink
-	implementation("org.eclipse.persistence:eclipselink:4.0.2")
-	implementation("org.eclipse.persistence:org.eclipse.persistence.jpa:4.0.2")
+	implementation("org.springframework.boot:spring-boot-starter-security")
 
 	// PostgreSQL
 	implementation("org.postgresql:postgresql:42.7.7")
@@ -41,6 +38,15 @@ dependencies {
 
 	// Environment variables support
 	implementation("me.paulschwarz:spring-dotenv:4.0.0")
+
+	// Lombok
+	compileOnly("org.projectlombok:lombok")
+	annotationProcessor("org.projectlombok:lombok")
+
+	// JWT
+	implementation("io.jsonwebtoken:jjwt-api:0.12.3")
+	implementation("io.jsonwebtoken:jjwt-impl:0.12.3")
+	implementation("io.jsonwebtoken:jjwt-jackson:0.12.3")
 
 	// Development tools
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
