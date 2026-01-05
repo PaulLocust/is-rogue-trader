@@ -3,10 +3,6 @@
 -- This script runs automatically on application startup
 -- ============================================
 
--- ============================================
--- 1. CREATE TABLES
--- ============================================
-
 -- 1. Users table (all roles)
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,

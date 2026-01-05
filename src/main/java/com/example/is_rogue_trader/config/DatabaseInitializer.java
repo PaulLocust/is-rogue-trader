@@ -3,10 +3,12 @@ package com.example.is_rogue_trader.config;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StreamUtils;
 
 import javax.sql.DataSource;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 
@@ -22,35 +24,44 @@ public class DatabaseInitializer {
 
     @PostConstruct
     public void initializeDatabase() {
+        log.info("=== START DATABASE INITIALIZATION ===");
+
         try (Connection connection = dataSource.getConnection()) {
-            log.info("Initializing database schema...");
-            
-            // Execute scripts in order
-            executeScript(connection, "sql/schema.sql");
-            executeScript(connection, "sql/functions.sql");
-            executeScript(connection, "sql/triggers.sql");
-            executeScript(connection, "sql/indexes.sql");
-            
-            log.info("Database initialization completed successfully");
-        } catch (SQLException e) {
-            log.error("Error initializing database", e);
+            // Выполняем каждый скрипт с детальным логированием
+            executeScriptManually(connection, "sql/schema.sql");
+            executeScriptManually(connection, "sql/functions.sql");
+            executeScriptManually(connection, "sql/triggers.sql");
+            executeScriptManually(connection, "sql/indexes.sql");
+
+            log.info("=== DATABASE INITIALIZATION COMPLETED ===");
+
+        } catch (Exception e) {
+            log.error("FATAL: Database initialization error", e);
             throw new RuntimeException("Failed to initialize database", e);
         }
     }
 
-    private void executeScript(Connection connection, String scriptPath) {
+    private void executeScriptManually(Connection connection, String scriptPath) {
+        log.info("--- Executing: {} ---", scriptPath);
+
         try {
-            log.info("Executing script: {}", scriptPath);
-            ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
-            populator.addScript(new ClassPathResource(scriptPath));
-            populator.setContinueOnError(true);
-            populator.setSeparator(";");
-            populator.populate(connection);
-            log.info("Script {} executed successfully", scriptPath);
+            // Читаем весь файл
+            String sql = StreamUtils.copyToString(
+                    new ClassPathResource(scriptPath).getInputStream(),
+                    StandardCharsets.UTF_8
+            );
+
+            // Для PL/pgSQL функций нужно разделять по $$ или по концу функции
+            // Проще выполнить весь файл целиком
+            try (var statement = connection.createStatement()) {
+                statement.execute(sql);
+            }
+
+            log.info("✓ {} executed successfully", scriptPath);
+
         } catch (Exception e) {
-            log.error("Error executing script: {}", scriptPath, e);
-            // Continue with other scripts even if one fails
+            log.error("✗ ERROR executing {}: {}", scriptPath, e.getMessage(), e);
+            throw new RuntimeException("Script execution failed: " + scriptPath, e);
         }
     }
 }
-
