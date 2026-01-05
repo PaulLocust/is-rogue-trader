@@ -33,9 +33,16 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfig.corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Static resources
+                        .requestMatchers("/", "/index.html").permitAll()
+                        .requestMatchers("/*.html", "/*.css", "/*.js", "/*.png", "/*.jpg", "/*.gif", "/*.ico").permitAll()
+                        // API authentication endpoints
                         .requestMatchers("/api/auth/**").permitAll()
+                        // Swagger documentation
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/api-docs/**", "/v3/api-docs/**").permitAll()
+                        // Error pages
                         .requestMatchers("/error").permitAll()
+                        // All other requests require authentication
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

@@ -60,3 +60,52 @@ BEFORE INSERT ON projects
 FOR EACH ROW
 WHEN (NEW.status = 'PLANNED')
 EXECUTE FUNCTION check_project_resources();
+
+-- Trigger for checking upgrade compatibility with planet type
+CREATE OR REPLACE FUNCTION check_upgrade_compatibility()
+RETURNS TRIGGER AS $$
+DECLARE
+    planet_type_var VARCHAR(20);
+    upgrade_type_var VARCHAR(20);
+BEGIN
+    -- Get planet type
+    SELECT planet_type INTO planet_type_var
+    FROM planets WHERE id = NEW.planet_id;
+    
+    -- Get upgrade suitable types
+    SELECT suitable_types INTO upgrade_type_var
+    FROM upgrades WHERE id = NEW.upgrade_id;
+    
+    -- Check compatibility
+    IF planet_type_var != upgrade_type_var THEN
+        RAISE EXCEPTION 'Upgrade type % is not compatible with planet type %', 
+            upgrade_type_var, planet_type_var;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER compatibility_check
+BEFORE INSERT ON projects
+FOR EACH ROW
+EXECUTE FUNCTION check_upgrade_compatibility();
+
+-- Trigger to automatically add to planet_upgrades when project is completed
+CREATE OR REPLACE FUNCTION add_to_planet_upgrades()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status = 'COMPLETED' AND OLD.status != 'COMPLETED' THEN
+        -- Add to the many-to-many association table
+        INSERT INTO planet_upgrades (planet_id, upgrade_id)
+        VALUES (NEW.planet_id, NEW.upgrade_id)
+        ON CONFLICT (planet_id, upgrade_id) DO NOTHING;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER project_completion
+AFTER UPDATE ON projects
+FOR EACH ROW
+EXECUTE FUNCTION add_to_planet_upgrades();

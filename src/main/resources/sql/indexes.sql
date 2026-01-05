@@ -32,3 +32,12 @@ CREATE INDEX IF NOT EXISTS idx_governors_planet ON governors(planet_id);
 -- For upgrades (optimization for compatibility check)
 CREATE INDEX IF NOT EXISTS idx_upgrades_type ON upgrades(suitable_types);
 
+-- For many-to-many association table planet_upgrades
+CREATE INDEX IF NOT EXISTS idx_planet_upgrades_planet ON planet_upgrades(planet_id);
+CREATE INDEX IF NOT EXISTS idx_planet_upgrades_upgrade ON planet_upgrades(upgrade_id);
+
+-- For navigators (search by house)
+CREATE INDEX IF NOT EXISTS idx_navigators_house ON navigators(house_name);
+
+-- For rogue traders (search by warrant number)
+CREATE INDEX IF NOT EXISTS idx_rogue_traders_warrant ON rogue_traders(warrant_number);

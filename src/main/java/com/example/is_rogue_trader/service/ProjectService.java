@@ -40,17 +40,15 @@ public class ProjectService {
         Upgrade upgrade = upgradeRepository.findById(upgradeId)
                 .orElseThrow(() -> new RuntimeException("Улучшение не найдено"));
 
-        // Проверяем совместимость типа планеты и улучшения
-        if (!planet.getPlanetType().equals(upgrade.getSuitableTypes())) {
-            throw new IllegalArgumentException("Тип планеты не совместим с типом улучшения");
-        }
-
+        // Триггер check_upgrade_compatibility автоматически проверит совместимость
+        // Триггер check_project_resources автоматически проверит ресурсы и спишет их
+        
         Project project = new Project();
         project.setPlanet(planet);
         project.setUpgrade(upgrade);
         project.setStatus(ProjectStatus.PLANNED);
 
-        // Триггер автоматически проверит ресурсы и спишет их
+        // Триггеры автоматически проверят совместимость и ресурсы
         return projectRepository.save(project);
     }
 

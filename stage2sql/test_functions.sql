@@ -45,7 +45,7 @@ BEGIN
     
     -- Добавим новое событие для теста игнорирования
     INSERT INTO events (planet_id, event_type, severity, description, resolved) VALUES
-    (4, 'Бунт в улье', 5, 'Недовольство условиями жизни', false);
+    (4, 'INSURRECTION', 5, 'Dissatisfaction with living conditions', false);
     
     -- Игнорируем проблему
     PERFORM resolve_crisis(2, 'IGNORE');
@@ -80,9 +80,51 @@ BEGIN
 END $$;
 
 \echo ''
-\echo '4. Тестирование триггеров:'
+\echo '4. Тестирование НОВЫХ функций для работы с ассоциативной таблицей:'
+\echo '=================================================================='
+DO $$
+DECLARE
+    compatible BOOLEAN;
+    upgrade_rec RECORD;
+    stats_rec RECORD;
+BEGIN
+    -- Тестирование функции can_install_upgrade
+    RAISE NOTICE 'Тест совместимости улучшений:';
+    
+    -- Совместимый случай: AGRI_WORLD + Irrigation Systems (upgrade_id=1)
+    SELECT can_install_upgrade(1, 1) INTO compatible;
+    RAISE NOTICE 'Планета 1 (AGRI_WORLD) + Улучшение 1 (Irrigation): %', 
+        CASE WHEN compatible THEN 'Совместимо ✓' ELSE 'Несовместимо ✗' END;
+    
+    -- Несовместимый случай: AGRI_WORLD + Deep Mining Shafts (upgrade_id=2)
+    SELECT can_install_upgrade(1, 2) INTO compatible;
+    RAISE NOTICE 'Планета 1 (AGRI_WORLD) + Улучшение 2 (Mining): %', 
+        CASE WHEN compatible THEN 'Совместимо ✓' ELSE 'Несовместимо ✗' END;
+    
+    -- Тестирование функции get_installed_upgrades
+    RAISE NOTICE '';
+    RAISE NOTICE 'Установленные улучшения для планеты 1:';
+    FOR upgrade_rec IN SELECT * FROM get_installed_upgrades(1) LOOP
+        RAISE NOTICE '  - %: %', upgrade_rec.upgrade_name, upgrade_rec.upgrade_description;
+    END LOOP;
+    
+    -- Тестирование функции get_planet_stats_with_upgrades
+    RAISE NOTICE '';
+    RAISE NOTICE 'Статистика планеты 1 с информацией об улучшениях:';
+    FOR stats_rec IN SELECT * FROM get_planet_stats_with_upgrades(1) LOOP
+        RAISE NOTICE 'Планета: %', stats_rec.planet_name;
+        RAISE NOTICE 'Тип: %', stats_rec.planet_type;
+        RAISE NOTICE 'Лояльность: %', stats_rec.loyalty;
+        RAISE NOTICE 'Установлено улучшений: %', stats_rec.installed_upgrades_count;
+    END LOOP;
+END $$;
+
+\echo ''
+\echo '5. Тестирование триггеров:'
 \echo '==========================='
 DO $$
+DECLARE
+    is_compatible BOOLEAN;
 BEGIN
     -- Тест триггера update_rebellion_status
     RAISE NOTICE 'Тест триггера мятежа:';
@@ -115,8 +157,9 @@ BEGIN
         (SELECT cost_industry FROM upgrades WHERE id = 1),
         (SELECT cost_resources FROM upgrades WHERE id = 1);
     
-    -- Попробуем добавить корректный проект
+    -- Попробуем добавить новый проект
     BEGIN
+        -- Теперь создадим новый проект (совместимый и с достаточными ресурсами)
         INSERT INTO projects (planet_id, upgrade_id, status) VALUES (1, 1, 'PLANNED');
         RAISE NOTICE 'Проект успешно создан!';
         
@@ -142,12 +185,26 @@ BEGIN
         RAISE NOTICE 'ОШИБКА: Этот проект не должен был быть создан!';
     EXCEPTION 
         WHEN OTHERS THEN
-            RAISE NOTICE 'Триггер сработал правильно: %', SQLERRM;
+            RAISE NOTICE 'Триггер проверки совместимости сработал правильно: %', SQLERRM;
     END;
+    
+    -- Тест триггера add_to_planet_upgrades
+    RAISE NOTICE '';
+    RAISE NOTICE 'Тест триггера добавления в ассоциативную таблицу:';
+    RAISE NOTICE 'Количество записей в planet_upgrades до: %', (SELECT COUNT(*) FROM planet_upgrades);
+    
+    -- Создадим новый проект и завершим его
+    INSERT INTO projects (planet_id, upgrade_id, status) VALUES (2, 3, 'PLANNED');
+    UPDATE projects SET status = 'COMPLETED' WHERE planet_id = 2 AND upgrade_id = 3;
+    
+    RAISE NOTICE 'Количество записей в planet_upgrades после: %', (SELECT COUNT(*) FROM planet_upgrades);
+    RAISE NOTICE 'Запись в planet_upgrades: планета=%, улучшение=%', 
+        (SELECT planet_id FROM planet_upgrades WHERE planet_id = 2 AND upgrade_id = 3),
+        (SELECT upgrade_id FROM planet_upgrades WHERE planet_id = 2 AND upgrade_id = 3);
 END $$;
 
 \echo ''
-\echo '5. Тестирование ограничений (CHECK constraints):'
+\echo '6. Тестирование ограничений (CHECK constraints):'
 \echo '==============================================='
 DO $$
 BEGIN
@@ -161,10 +218,20 @@ BEGIN
             RAISE NOTICE 'CHECK constraint сработал: %', SQLERRM;
     END;
     
-    -- Попробуем вставить некорректный тип улучшения
+    -- Попробуем вставить некорректный тип события
     BEGIN
-        INSERT INTO upgrades (name, cost_wealth, cost_industry, cost_resources, suitable_types) 
-        VALUES ('Некорректное', 1000, 1000, 1000, 'INVALID_TYPE');
+        INSERT INTO events (planet_id, event_type, severity, description) 
+        VALUES (1, 'INVALID_EVENT', 5, 'Test');
+        RAISE NOTICE 'ОШИБКА: Вставка должна была завершиться ошибкой!';
+    EXCEPTION 
+        WHEN OTHERS THEN
+            RAISE NOTICE 'CHECK constraint сработал: %', SQLERRM;
+    END;
+    
+    -- Попробуем вставить некорректную роль пользователя
+    BEGIN
+        INSERT INTO users (email, password_hash, role) 
+        VALUES ('test@test.ru', 'hash', 'INVALID_ROLE');
         RAISE NOTICE 'ОШИБКА: Вставка должна была завершиться ошибкой!';
     EXCEPTION 
         WHEN OTHERS THEN
@@ -183,12 +250,70 @@ BEGIN
 END $$;
 
 \echo ''
+\echo '7. Демонстрация работы ассоциативной таблицы M:N:'
+\echo '================================================='
+DO $$
+DECLARE
+    rec RECORD;
+BEGIN
+    RAISE NOTICE 'Демонстрация отношения многие-ко-многим через таблицу planet_upgrades:';
+    RAISE NOTICE '---------------------------------------------------------------------';
+    
+    RAISE NOTICE 'Пример 1: Какие улучшения установлены на каждой планете?';
+    FOR rec IN (
+        SELECT 
+            p.name as planet_name,
+            STRING_AGG(u.name, ', ') as installed_upgrades
+        FROM planets p
+        LEFT JOIN planet_upgrades pu ON p.id = pu.planet_id
+        LEFT JOIN upgrades u ON pu.upgrade_id = u.id
+        GROUP BY p.id, p.name
+        ORDER BY p.name
+    ) LOOP
+        RAISE NOTICE 'Планета "%": %', 
+            rec.planet_name, 
+            COALESCE(rec.installed_upgrades, 'нет улучшений');
+    END LOOP;
+    
+    RAISE NOTICE '';
+    RAISE NOTICE 'Пример 2: На каких планетах установлено конкретное улучшение?';
+    FOR rec IN (
+        SELECT 
+            u.name as upgrade_name,
+            STRING_AGG(p.name, ', ') as installed_on_planets
+        FROM upgrades u
+        LEFT JOIN planet_upgrades pu ON u.id = pu.upgrade_id
+        LEFT JOIN planets p ON pu.planet_id = p.id
+        GROUP BY u.id, u.name
+        ORDER BY u.name
+    ) LOOP
+        RAISE NOTICE 'Улучшение "%": %', 
+            rec.upgrade_name, 
+            COALESCE(rec.installed_on_planets, 'ни на одной планете');
+    END LOOP;
+    
+    RAISE NOTICE '';
+    RAISE NOTICE 'Пример 3: Проверка связи M:N - одна планета может иметь несколько улучшений';
+    RAISE NOTICE 'Добавим еще одно улучшение на планету 1...';
+    
+    -- Добавим совместимое улучшение (но сначала проверим ресурсы)
+    UPDATE planets SET wealth = wealth + 10000 WHERE id = 1;
+    
+    INSERT INTO projects (planet_id, upgrade_id, status) VALUES (1, 1, 'PLANNED');
+    UPDATE projects SET status = 'COMPLETED' WHERE planet_id = 1 AND upgrade_id = 1 AND status = 'PLANNED';
+    
+    RAISE NOTICE 'Теперь на планете 1 установлено улучшений: %', 
+        (SELECT COUNT(*) FROM planet_upgrades WHERE planet_id = 1);
+END $$;
+
+\echo ''
 \echo '=== ИТОГОВАЯ СВОДКА ==='
 SELECT 
     (SELECT COUNT(*) FROM users) as users_count,
     (SELECT COUNT(*) FROM planets) as planets_count,
     (SELECT COUNT(*) FROM messages) as messages_count,
     (SELECT COUNT(*) FROM projects) as projects_count,
-    (SELECT COUNT(*) FROM events WHERE NOT resolved) as active_events_count;
+    (SELECT COUNT(*) FROM events WHERE NOT resolved) as active_events_count,
+    (SELECT COUNT(*) FROM planet_upgrades) as planet_upgrades_count;
 
 \echo 'Тестирование завершено!'

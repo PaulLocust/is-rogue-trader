@@ -1,5 +1,6 @@
 package com.example.is_rogue_trader.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -23,6 +24,7 @@ public class RogueTrader {
 
     @OneToOne
     @JoinColumn(name = "user_id", unique = true, nullable = false)
+    @JsonIgnore
     private User user;
 
     @Column(name = "dynasty_name", nullable = false)
@@ -38,6 +40,7 @@ public class RogueTrader {
     private Integer influence = 50;
 
     @OneToMany(mappedBy = "trader", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Planet> planets = new ArrayList<>();
 }
 

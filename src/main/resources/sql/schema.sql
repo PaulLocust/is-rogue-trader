@@ -96,31 +96,35 @@ CREATE TABLE IF NOT EXISTS upgrades (
     cost_wealth DECIMAL(15,2) NOT NULL,
     cost_industry DECIMAL(15,2) NOT NULL,
     cost_resources DECIMAL(15,2) NOT NULL,
-    suitable_types VARCHAR(20) NOT NULL CHECK (
-        suitable_types IN (
-            'AGRI_WORLD', 
-            'FORGE_WORLD', 
-            'MINING_WORLD',
-            'CIVILIZED_WORLD', 
-            'DEATH_WORLD', 
-            'HIVE_WORLD', 
-            'FEUDAL_WORLD'
-        )
-    )
+    suitable_types VARCHAR(20) NOT NULL CHECK (suitable_types IN (
+        'AGRI_WORLD', 
+        'FORGE_WORLD', 
+        'MINING_WORLD',
+        'CIVILIZED_WORLD', 
+        'DEATH_WORLD', 
+        'HIVE_WORLD', 
+        'FEUDAL_WORLD'
+    ))
 );
 
--- 10. Projects table
+-- 10. Many-to-many association table for planets and upgrades
+CREATE TABLE IF NOT EXISTS planet_upgrades (
+    planet_id INT NOT NULL REFERENCES planets(id) ON DELETE CASCADE,
+    upgrade_id INT NOT NULL REFERENCES upgrades(id) ON DELETE CASCADE,
+    PRIMARY KEY (planet_id, upgrade_id)
+);
+
+-- 11. Projects table
 CREATE TABLE IF NOT EXISTS projects (
     id SERIAL PRIMARY KEY,
     planet_id INT NOT NULL REFERENCES planets(id),
     upgrade_id INT NOT NULL REFERENCES upgrades(id),
     start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completion_date TIMESTAMP,
-    status VARCHAR(20) DEFAULT 'PLANNED',
-    UNIQUE(planet_id, upgrade_id, status)
+    status VARCHAR(20) DEFAULT 'PLANNED' CHECK (status IN ('PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'))
 );
 
--- 11. Events table
+-- 12. Events table
 CREATE TABLE IF NOT EXISTS events (
     id SERIAL PRIMARY KEY,
     planet_id INT NOT NULL REFERENCES planets(id),

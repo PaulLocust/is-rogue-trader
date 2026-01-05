@@ -26,5 +26,23 @@ public class AuthResponse {
 
     @Schema(description = "Роль пользователя", example = "TRADER")
     private String role;
+
+    @Schema(description = "ID торговца (только для TRADER)", example = "1")
+    private Long traderId;
+
+    @Schema(description = "ID планеты (только для GOVERNOR)", example = "1")
+    private Long planetId;
+
+    @Schema(description = "ID навигатора (только для NAVIGATOR)", example = "1")
+    private Long navigatorId;
+
+    @Schema(description = "ID астропата (только для ASTROPATH)", example = "1")
+    private Long astropathId;
+
+    @Schema(description = "Уровень пси (только для ASTROPATH)", example = "7")
+    private Integer psiLevel;
+
+    @Schema(description = "Название дома (только для NAVIGATOR)", example = "House of Ravens")
+    private String houseName;
 }
 

@@ -1,6 +1,7 @@
 package com.example.is_rogue_trader.model.entity;
 
 import com.example.is_rogue_trader.model.enums.ProjectStatus;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -22,10 +23,12 @@ public class Project {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "planet_id", nullable = false)
+    @JsonIgnore
     private Planet planet;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "upgrade_id", nullable = false)
+    @JsonIgnore
     private Upgrade upgrade;
 
     @Column(name = "start_date")

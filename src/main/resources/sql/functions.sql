@@ -81,7 +81,7 @@ END;
 $func$ LANGUAGE plpgsql;
 
 -- Function for calculating empire resources
-CREATE OR REPLACE FUNCTION get_empire_resources(trader_id_param INT)
+CREATE OR REPLACE FUNCTION get_empire_resources(trader_id_param BIGINT)
 RETURNS TABLE(
     total_wealth DECIMAL,
     total_industry DECIMAL,
@@ -100,3 +100,71 @@ BEGIN
 END;
 $func$ LANGUAGE plpgsql;
 
+-- Function to get installed upgrades for a planet
+CREATE OR REPLACE FUNCTION get_installed_upgrades(planet_id_param INT)
+RETURNS TABLE(
+    upgrade_id INT,
+    upgrade_name VARCHAR(100),
+    upgrade_description TEXT
+) AS $func$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        u.id,
+        u.name,
+        u.description
+    FROM upgrades u
+    INNER JOIN planet_upgrades pu ON u.id = pu.upgrade_id
+    WHERE pu.planet_id = planet_id_param
+    ORDER BY u.name;
+END;
+$func$ LANGUAGE plpgsql;
+
+-- Function to check if upgrade can be installed on planet
+CREATE OR REPLACE FUNCTION can_install_upgrade(
+    planet_id_param INT,
+    upgrade_id_param INT
+) RETURNS BOOLEAN AS $func$
+DECLARE
+    planet_type_var VARCHAR(20);
+    upgrade_type_var VARCHAR(20);
+BEGIN
+    -- Get planet type
+    SELECT planet_type INTO planet_type_var
+    FROM planets WHERE id = planet_id_param;
+    
+    -- Get upgrade type
+    SELECT suitable_types INTO upgrade_type_var
+    FROM upgrades WHERE id = upgrade_id_param;
+    
+    -- Check compatibility
+    RETURN planet_type_var = upgrade_type_var;
+END;
+$func$ LANGUAGE plpgsql;
+
+-- Function to get planet statistics with installed upgrades
+CREATE OR REPLACE FUNCTION get_planet_stats_with_upgrades(planet_id_param INT)
+RETURNS TABLE(
+    planet_name VARCHAR(100),
+    planet_type VARCHAR(20),
+    loyalty DECIMAL(5,2),
+    wealth DECIMAL(15,2),
+    industry DECIMAL(15,2),
+    resources DECIMAL(15,2),
+    installed_upgrades_count BIGINT
+) AS $func$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.name,
+        p.planet_type,
+        p.loyalty,
+        p.wealth,
+        p.industry,
+        p.resources,
+        (SELECT COUNT(*) FROM planet_upgrades pu 
+         WHERE pu.planet_id = p.id) as installed_count
+    FROM planets p
+    WHERE p.id = planet_id_param;
+END;
+$func$ LANGUAGE plpgsql;

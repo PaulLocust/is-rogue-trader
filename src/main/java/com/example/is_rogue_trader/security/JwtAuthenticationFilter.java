@@ -25,6 +25,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        // Skip JWT authentication for static resources
+        String path = request.getRequestURI();
+        if (path.equals("/") || path.startsWith("/index.html") || 
+            path.endsWith(".html") || path.endsWith(".css") || 
+            path.endsWith(".js") || path.endsWith(".png") || 
+            path.endsWith(".jpg") || path.endsWith(".gif") || 
+            path.endsWith(".ico")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+        
         try {
             String jwt = getJwtFromRequest(request);
 

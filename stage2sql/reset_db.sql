@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS planet_upgrades CASCADE;
 DROP TABLE IF EXISTS projects CASCADE;
 DROP TABLE IF EXISTS upgrades CASCADE;
 DROP TABLE IF EXISTS events CASCADE;
@@ -13,6 +14,10 @@ DROP TABLE IF EXISTS rogue_traders CASCADE;
 DROP FUNCTION IF EXISTS update_rebellion_status CASCADE;
 DROP FUNCTION IF EXISTS check_project_resources CASCADE;
 DROP FUNCTION IF EXISTS check_upgrade_compatibility CASCADE;
+DROP FUNCTION IF EXISTS add_to_planet_upgrades CASCADE;
 DROP FUNCTION IF EXISTS send_message CASCADE;
 DROP FUNCTION IF EXISTS resolve_crisis CASCADE;
 DROP FUNCTION IF EXISTS get_empire_resources CASCADE;
+DROP FUNCTION IF EXISTS get_installed_upgrades CASCADE;
+DROP FUNCTION IF EXISTS can_install_upgrade CASCADE;
+DROP FUNCTION IF EXISTS get_planet_stats_with_upgrades CASCADE;

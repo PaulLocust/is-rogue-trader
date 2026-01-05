@@ -1,6 +1,7 @@
 package com.example.is_rogue_trader.model.entity;
 
 import com.example.is_rogue_trader.model.enums.EventType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -22,6 +23,7 @@ public class Event {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "planet_id", nullable = false)
+    @JsonIgnore
     private Planet planet;
 
     @Enumerated(EnumType.STRING)

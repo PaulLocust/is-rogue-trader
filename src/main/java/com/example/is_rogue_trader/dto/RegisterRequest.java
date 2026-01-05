@@ -34,5 +34,14 @@ public class RegisterRequest {
 
     @Schema(description = "Номер варранта (только для TRADER)", example = "WARRANT-002")
     private String warrantNumber;
+
+    @Schema(description = "ID планеты (только для GOVERNOR)", example = "1")
+    private Long planetId;
+
+    @Schema(description = "Уровень пси (только для ASTROPATH, 1-10)", example = "7")
+    private Integer psiLevel;
+
+    @Schema(description = "Название дома (только для NAVIGATOR)", example = "House of Ravens")
+    private String houseName;
 }
 

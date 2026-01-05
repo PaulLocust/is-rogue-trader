@@ -16,8 +16,6 @@ CREATE TABLE rogue_traders (
     influence INT DEFAULT 50 CHECK (influence >= 0 AND influence <= 100)
 );
 
-
-
 -- 3. Таблица планет
 CREATE TABLE planets (
     id SERIAL PRIMARY KEY,
@@ -89,38 +87,42 @@ CREATE TABLE upgrades (
     cost_wealth DECIMAL(15,2) NOT NULL,
     cost_industry DECIMAL(15,2) NOT NULL,
     cost_resources DECIMAL(15,2) NOT NULL,
-    suitable_types VARCHAR(20) NOT NULL CHECK (
-        suitable_types IN (
-            'AGRI_WORLD', 
-            'FORGE_WORLD', 
-            'MINING_WORLD',
-            'CIVILIZED_WORLD', 
-            'DEATH_WORLD', 
-            'HIVE_WORLD', 
-            'FEUDAL_WORLD'
-        )
-    )
+    suitable_types VARCHAR(20) NOT NULL CHECK (suitable_types IN (
+        'AGRI_WORLD', 
+        'FORGE_WORLD', 
+        'MINING_WORLD',
+        'CIVILIZED_WORLD', 
+        'DEATH_WORLD', 
+        'HIVE_WORLD', 
+        'FEUDAL_WORLD'
+    ))
 );
 
--- 10. Таблица проектов
+-- 10. ЧИСТАЯ АССОЦИАТИВНАЯ ТАБЛИЦА для отношения многие-ко-многим
+CREATE TABLE planet_upgrades (
+    planet_id INT NOT NULL REFERENCES planets(id) ON DELETE CASCADE,
+    upgrade_id INT NOT NULL REFERENCES upgrades(id) ON DELETE CASCADE,
+    PRIMARY KEY (planet_id, upgrade_id)
+);
+
+-- 11. Таблица проектов
 CREATE TABLE projects (
     id SERIAL PRIMARY KEY,
     planet_id INT NOT NULL REFERENCES planets(id),
     upgrade_id INT NOT NULL REFERENCES upgrades(id),
     start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completion_date TIMESTAMP,
-    status VARCHAR(20) DEFAULT 'PLANNED',
-    UNIQUE(planet_id, upgrade_id, status)
+    status VARCHAR(20) DEFAULT 'PLANNED' CHECK (status IN ('PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'))
 );
 
--- 11. Таблица событий
+-- 12. Таблица событий
 CREATE TABLE events (
     id SERIAL PRIMARY KEY,
     planet_id INT NOT NULL REFERENCES planets(id),
     event_type VARCHAR(50) NOT NULL CHECK (
         event_type IN (
             'INSURRECTION',
-            'NATURAL_DISASTEL', 
+            'NATURAL_DISASTER',
             'ECONOMIC_CRISIS',
             'EXTERNAL_THREAT'
         )
