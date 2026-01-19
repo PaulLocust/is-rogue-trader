@@ -14,6 +14,10 @@ CREATE INDEX IF NOT EXISTS idx_planets_type ON planets(planet_type);
 CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender_id);
 CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id);
 CREATE INDEX IF NOT EXISTS idx_messages_sent_at ON messages(sent_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_type ON messages(message_type);
+CREATE INDEX IF NOT EXISTS idx_messages_command ON messages(command_id);
+CREATE INDEX IF NOT EXISTS idx_messages_completed ON messages(completed);
+CREATE INDEX IF NOT EXISTS idx_messages_delivered ON messages(delivered);
 
 -- For events
 CREATE INDEX IF NOT EXISTS idx_events_planet_resolved ON events(planet_id, resolved);

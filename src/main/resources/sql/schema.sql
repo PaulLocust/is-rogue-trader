@@ -76,18 +76,28 @@ CREATE TABLE IF NOT EXISTS routes (
 -- 8. Messages table
 CREATE TABLE IF NOT EXISTS messages (
     id SERIAL PRIMARY KEY,
-    sender_id INT NOT NULL REFERENCES users(id),
-    receiver_id INT NOT NULL REFERENCES users(id),
+    sender_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    receiver_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
+    message_type VARCHAR(50),
+    command_id BIGINT,
+    resources_wealth DECIMAL(15,2) DEFAULT 0,
+    resources_industry DECIMAL(15,2) DEFAULT 0,
+    resources_resources DECIMAL(15,2) DEFAULT 0,
     sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     delivered BOOLEAN DEFAULT FALSE,
-    distorted BOOLEAN DEFAULT FALSE
+    distorted BOOLEAN DEFAULT FALSE,
+    distortion_chance DECIMAL(3,2) DEFAULT 0.1,
+    completed BOOLEAN DEFAULT FALSE,
+    completion_date TIMESTAMP,
+    CONSTRAINT fk_messages_sender FOREIGN KEY (sender_id) REFERENCES users(id),
+    CONSTRAINT fk_messages_receiver FOREIGN KEY (receiver_id) REFERENCES users(id)
 );
 
 -- 9. Upgrades table
 CREATE TABLE IF NOT EXISTS upgrades (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) UNIQUE NOT NULL,
     description TEXT,
     cost_wealth DECIMAL(15,2) NOT NULL,
     cost_industry DECIMAL(15,2) NOT NULL,

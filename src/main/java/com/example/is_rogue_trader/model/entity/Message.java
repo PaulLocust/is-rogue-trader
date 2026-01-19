@@ -1,5 +1,6 @@
 package com.example.is_rogue_trader.model.entity;
 
+import com.example.is_rogue_trader.model.enums.MessageType;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -7,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -41,5 +43,26 @@ public class Message {
 
     @Column
     private Boolean distorted = false;
-}
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "message_type")
+    private MessageType messageType;
+
+    @Column(name = "command_id")
+    private Long commandId; // ID связанной команды
+
+    @Column(name = "resources_wealth", precision = 15, scale = 2)
+    private BigDecimal resourcesWealth;
+
+    @Column(name = "resources_industry", precision = 15, scale = 2)
+    private BigDecimal resourcesIndustry;
+
+    @Column(name = "resources_resources", precision = 15, scale = 2)
+    private BigDecimal resourcesResources;
+
+    @Column(name = "completed")
+    private Boolean completed = false;
+
+    @Column(name = "completion_date")
+    private LocalDateTime completionDate;
+}

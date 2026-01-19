@@ -18,9 +18,24 @@ import java.util.List;
 public class EventService {
     private final EventRepository eventRepository;
     private final PlanetRepository planetRepository;
-    
+
     @PersistenceContext
     private EntityManager entityManager;
+
+    // Добавьте этот метод:
+    public List<Event> getEventsByTrader(Long traderId) {
+        return eventRepository.findByTraderId(traderId);
+    }
+
+    // Или если нужны только активные:
+    public List<Event> getActiveEventsByTrader(Long traderId) {
+        return eventRepository.findActiveEventsByTraderId(traderId);
+    }
+
+    // Получить все события (для общего endpoint)
+    public List<Event> getAllEvents() {
+        return eventRepository.findAll();
+    }
 
     public List<Event> getActiveEvents(Long planetId) {
         return eventRepository.findActiveEventsByPlanetId(planetId);
@@ -61,18 +76,17 @@ public class EventService {
         // Вызываем PL/pgSQL функцию resolve_crisis()
         BigDecimal wealthParam = wealth != null ? wealth : BigDecimal.ZERO;
         BigDecimal industryParam = industry != null ? industry : BigDecimal.ZERO;
-        
+
         // Функция возвращает VOID, поэтому используем executeUpdate
         entityManager.createNativeQuery(
-                "SELECT resolve_crisis(:eventId, :action, :wealth, :industry)")
+                        "SELECT resolve_crisis(:eventId, :action, :wealth, :industry)")
                 .setParameter("eventId", eventId)
                 .setParameter("action", action)
                 .setParameter("wealth", wealthParam)
                 .setParameter("industry", industryParam)
                 .executeUpdate();
-        
+
         // Функция уже обновила событие в БД, обновляем в контексте JPA
         entityManager.refresh(event);
     }
 }
-

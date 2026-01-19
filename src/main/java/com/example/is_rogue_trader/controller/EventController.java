@@ -24,9 +24,26 @@ import java.util.Map;
 public class EventController {
     private final EventService eventService;
 
+    // Добавьте эти endpoints:
+    @GetMapping
+    @Operation(summary = "Получить все события", description = "Возвращает все события в системе",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<List<Event>> getAllEvents() {
+        return ResponseEntity.ok(eventService.getAllEvents());
+    }
+
+    @GetMapping("/trader/{traderId}")
+    @Operation(summary = "Получить события торговца",
+            description = "Возвращает все события планет торговца",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<List<Event>> getEventsByTrader(
+            @Parameter(description = "ID торговца", required = true) @PathVariable Long traderId) {
+        return ResponseEntity.ok(eventService.getEventsByTrader(traderId));
+    }
+
     @GetMapping("/planet/{planetId}")
     @Operation(summary = "Получить события планеты", description = "Возвращает все события планеты",
-               security = @SecurityRequirement(name = "bearerAuth"))
+            security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<List<Event>> getEventsByPlanet(
             @Parameter(description = "ID планеты", required = true) @PathVariable Long planetId) {
         return ResponseEntity.ok(eventService.getEventsByPlanet(planetId));
@@ -34,7 +51,7 @@ public class EventController {
 
     @GetMapping("/planet/{planetId}/active")
     @Operation(summary = "Получить активные события", description = "Возвращает неразрешенные события планеты",
-               security = @SecurityRequirement(name = "bearerAuth"))
+            security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<List<Event>> getActiveEvents(
             @Parameter(description = "ID планеты", required = true) @PathVariable Long planetId) {
         return ResponseEntity.ok(eventService.getActiveEvents(planetId));
@@ -42,7 +59,7 @@ public class EventController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Получить событие по ID", description = "Возвращает информацию о событии",
-               security = @SecurityRequirement(name = "bearerAuth"))
+            security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<Event> getEvent(
             @Parameter(description = "ID события", required = true) @PathVariable Long id) {
         return ResponseEntity.ok(eventService.getEventById(id));
@@ -50,7 +67,7 @@ public class EventController {
 
     @PostMapping
     @Operation(summary = "Создать событие", description = "Создает новое событие на планете",
-               security = @SecurityRequirement(name = "bearerAuth"))
+            security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<Event> createEvent(@Valid @RequestBody CreateEventRequest request) {
         Event event = new Event();
         Planet planet = new Planet();
@@ -63,11 +80,11 @@ public class EventController {
     }
 
     @PostMapping("/{id}/resolve")
-    @Operation(summary = "Разрешить кризис", 
-               description = "Разрешает кризис используя PL/pgSQL функцию resolve_crisis(). " +
-                           "Действие HELP - выделяет ресурсы и повышает лояльность. " +
-                           "Действие IGNORE - снижает лояльность и ресурсы.",
-               security = @SecurityRequirement(name = "bearerAuth"))
+    @Operation(summary = "Разрешить кризис",
+            description = "Разрешает кризис используя PL/pgSQL функцию resolve_crisis(). " +
+                    "Действие HELP - выделяет ресурсы и повышает лояльность. " +
+                    "Действие IGNORE - снижает лояльность и ресурсы.",
+            security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<Map<String, String>> resolveCrisis(
             @Parameter(description = "ID события", required = true) @PathVariable Long id,
             @Valid @RequestBody ResolveCrisisRequest request) {
@@ -75,4 +92,3 @@ public class EventController {
         return ResponseEntity.ok(Map.of("status", "resolved", "eventId", id.toString()));
     }
 }
-

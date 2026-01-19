@@ -44,7 +44,7 @@ $func$ LANGUAGE plpgsql;
 
 -- Function for resolving crisis
 CREATE OR REPLACE FUNCTION resolve_crisis(
-    event_id INT,
+    event_id BIGINT,
     action VARCHAR(10),
     resources_wealth DECIMAL DEFAULT 0,
     resources_industry DECIMAL DEFAULT 0

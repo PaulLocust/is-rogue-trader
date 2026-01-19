@@ -32,6 +32,7 @@ public class DatabaseInitializer {
             executeScriptManually(connection, "sql/functions.sql");
             executeScriptManually(connection, "sql/triggers.sql");
             executeScriptManually(connection, "sql/indexes.sql");
+            //executeScriptManually(connection, "sql/data-upgrades.sql");
 
             log.info("=== DATABASE INITIALIZATION COMPLETED ===");
 
