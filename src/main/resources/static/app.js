@@ -194,6 +194,10 @@ const api = {
     return this.request(`/routes/navigator/${navigatorId}`);
   },
 
+  async getTraderRoutes(traderId) {
+    return this.request(`/routes/trader/${traderId}`);
+  },
+
   async createRoute(fromPlanetId, toPlanetId, navigatorId) {
     return this.request('/routes', {
       method: 'POST',
@@ -736,19 +740,21 @@ function TraderDashboard({ user }) {
     if (!user.traderId) return;
     setLoading(true);
     try {
-      const [resources, planetsData, eventsData, upgradesData, usersData, messages] = await Promise.all([
+      const [resources, planetsData, eventsData, upgradesData, usersData, messages, routesData] = await Promise.all([
         api.getEmpireResources(user.traderId),
         api.getPlanets(user.traderId),
         api.getTraderEvents(user.traderId),
         api.getUpgrades(),
         api.getUsers(),
-        api.getMessagesForUser(user.id || user.userId || user.traderId)
+        api.getMessagesForUser(user.id || user.userId || user.traderId),
+        api.getTraderRoutes(user.traderId)
       ]);
       setEmpireResources(resources);
       setPlanets(planetsData);
       setEvents(eventsData);
       setUpgrades(upgradesData);
       setUsers(usersData);
+      setRoutes(routesData);
 
       // Фильтруем команды, созданные торговцем
       const traderCommands = messages.filter(msg =>

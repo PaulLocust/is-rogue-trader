@@ -23,6 +23,10 @@ public class RouteService {
         return routeRepository.findByNavigatorId(navigatorId);
     }
 
+    public List<Route> getRoutesByTrader(Long traderId) {
+        return routeRepository.findByTraderId(traderId);
+    }
+
     public Route getRouteById(Long id) {
         return routeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Маршрут не найден"));
@@ -36,6 +40,11 @@ public class RouteService {
                 .orElseThrow(() -> new RuntimeException("Планета назначения не найдена"));
         Navigator navigator = navigatorRepository.findById(navigatorId)
                 .orElseThrow(() -> new RuntimeException("Навигатор не найден"));
+
+        // Проверяем, что маршрут между этими планетами (в любом направлении) ещё не существует
+        if (!routeRepository.findRoutesBetweenPlanets(fromPlanetId, toPlanetId).isEmpty()) {
+            throw new RuntimeException("Маршрут между этими планетами уже существует");
+        }
 
         Route route = new Route();
         route.setFromPlanet(fromPlanet);

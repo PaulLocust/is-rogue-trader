@@ -41,6 +41,14 @@ public class RouteController {
         return ResponseEntity.ok(routeService.getRoutesByNavigator(navigatorId));
     }
 
+    @GetMapping("/trader/{traderId}")
+    @Operation(summary = "Получить маршруты торговца", description = "Возвращает все маршруты внутри империи данного торговца",
+               security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<List<Route>> getRoutesByTrader(
+            @Parameter(description = "ID торговца", required = true) @PathVariable Long traderId) {
+        return ResponseEntity.ok(routeService.getRoutesByTrader(traderId));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Получить маршрут по ID", description = "Возвращает информацию о маршруте",
                security = @SecurityRequirement(name = "bearerAuth"))
