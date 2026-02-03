@@ -67,12 +67,12 @@ public class MessageService {
     }
 
     public List<Message> getPendingMessagesForAstropath(Long astropathId) {
-        // Сообщения, где астропат отправитель и они не доставлены
-        return messageRepository.findBySenderIdAndDeliveredFalse(astropathId);
+        // Сообщения, где астропат получатель и они не доставлены
+        return messageRepository.findByReceiverIdAndDeliveredFalse(astropathId);
     }
 
     public List<Message> getDeliveredMessagesForAstropath(Long astropathId) {
-        return messageRepository.findBySenderIdAndDeliveredTrue(astropathId);
+        return messageRepository.findBySenderId(astropathId);
     }
 
     public List<Message> getCommandsForReceiver(Long receiverId) {

@@ -18,6 +18,9 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     @Query("SELECT m FROM Message m WHERE m.sender.id = :senderId AND m.delivered = false ORDER BY m.sentAt DESC")
     List<Message> findBySenderIdAndDeliveredFalse(@Param("senderId") Long senderId);
 
+    @Query("SELECT m FROM Message m WHERE m.receiver.id = :receiverId AND m.delivered = false ORDER BY m.sentAt DESC")
+    List<Message> findByReceiverIdAndDeliveredFalse(@Param("receiverId") Long receiverId);
+
     @Query("SELECT m FROM Message m WHERE m.sender.id = :senderId AND m.delivered = true ORDER BY m.sentAt DESC")
     List<Message> findBySenderIdAndDeliveredTrue(@Param("senderId") Long senderId);
 

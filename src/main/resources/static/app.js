@@ -134,8 +134,16 @@ const api = {
     return this.request(`/messages/astropath/${astropathId}/pending`);
   },
 
+  async getDeliveredMessagesForAstropath(astropathId) {
+    return this.request(`/messages/astropath/${astropathId}/delivered`);
+  },
+
   async getCommandsForReceiver(receiverId) {
     return this.request(`/messages/receiver/${receiverId}/commands`);
+  },
+
+  async getCompletedCommandsForTrader(traderId) {
+    return this.request(`/messages/trader/${traderId}/completed-commands`);
   },
 
   async markMessageDelivered(messageId) {
@@ -199,9 +207,15 @@ const api = {
   },
 
   async createRoute(fromPlanetId, toPlanetId, navigatorId) {
-    return this.request('/routes', {
+    return this.request('/navigators/routes', {
       method: 'POST',
       body: JSON.stringify({ fromPlanetId, toPlanetId, navigatorId }),
+    });
+  },
+
+  async executeRouteCommand(messageId) {
+    return this.request(`/navigators/commands/${messageId}/execute`, {
+      method: 'POST',
     });
   },
 
@@ -222,6 +236,7 @@ const api = {
     return this.request(`/astropaths/${astropathId}/send`, {
       method: 'POST',
       body: JSON.stringify({
+        senderId: parseInt(astropathId),
         receiverId,
         content,
         messageType,
@@ -251,12 +266,7 @@ function EmpireMap({ planets, routes, onPlanetClick, showDetails = true, interac
     if (planet.isRebellious) return '#d32f2f';
     if (planet.loyalty < 30) return '#ff5252';
     if (planet.loyalty < 50) return '#ff9800';
-    if (planet.planetType === 'AGRI_WORLD') return '#4caf50';
-    if (planet.planetType === 'FORGE_WORLD') return '#f44336';
-    if (planet.planetType === 'MINING_WORLD') return '#795548';
-    if (planet.planetType === 'HIVE_WORLD') return '#9c27b0';
-    if (planet.planetType === 'DEATH_WORLD') return '#607d8b';
-    return '#2196f3';
+    return '#4caf50'; // Всегда зеленый для лояльных планет, независимо от типа
   };
 
   const getPlanetPosition = (planetId) => {
@@ -403,12 +413,13 @@ function EmpireMap({ planets, routes, onPlanetClick, showDetails = true, interac
       ctx.textBaseline = 'middle';
       ctx.fillText(icon, x, y);
 
-      if (showDetails) {
-        ctx.fillStyle = '#e0e0e0';
-        ctx.font = 'bold 12px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(planet.name, x, y - 30);
+      // Всегда показываем название планеты
+      ctx.fillStyle = '#e0e0e0';
+      ctx.font = 'bold 12px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(planet.name, x, y - 30);
 
+      if (showDetails) {
         ctx.fillStyle = planet.loyalty < 30 ? '#ff5252' : planet.loyalty < 50 ? '#ff9800' : '#4caf50';
         ctx.font = '10px Arial';
         ctx.fillText(`${planet.loyalty ? planet.loyalty.toFixed(0) : 0}%`, x, y + 25);
@@ -742,14 +753,15 @@ function TraderDashboard({ user }) {
     if (!user.traderId) return;
     setLoading(true);
     try {
-      const [resources, planetsData, eventsData, upgradesData, usersData, messages, routesData] = await Promise.all([
+      const [resources, planetsData, eventsData, upgradesData, usersData, messages, routesData, completedCommands] = await Promise.all([
         api.getEmpireResources(user.traderId),
         api.getPlanets(user.traderId),
         api.getTraderEvents(user.traderId),
         api.getUpgrades(),
         api.getUsers(),
         api.getMessagesForUser(user.id || user.userId || user.traderId),
-        api.getTraderRoutes(user.traderId)
+        api.getTraderRoutes(user.traderId),
+        api.getCompletedCommandsForTrader(user.id || user.userId)
       ]);
       setEmpireResources(resources);
       setPlanets(planetsData);
@@ -762,7 +774,15 @@ function TraderDashboard({ user }) {
       const traderCommands = messages.filter(msg =>
           msg.sender && (msg.sender.id === user.id || msg.sender.id === user.userId)
       );
-      setCommands(traderCommands);
+
+      // Объединяем с явно полученными выполненными командами для гарантированного обновления статуса
+      const commandMap = new Map();
+      traderCommands.forEach(cmd => commandMap.set(cmd.id, cmd));
+      if (completedCommands && Array.isArray(completedCommands)) {
+        completedCommands.forEach(cmd => commandMap.set(cmd.id, cmd));
+      }
+      
+      setCommands(Array.from(commandMap.values()));
     } catch (error) {
       setMessage({ type: 'error', text: `Ошибка загрузки данных: ${error.message}` });
     } finally {
@@ -1906,7 +1926,7 @@ function NavigatorDashboard({ user }) {
     }
 
     try {
-      await api.createRoute(routeForm.fromPlanetId, routeForm.toPlanetId, user.id || user.navigatorId);
+      await api.createRoute(routeForm.fromPlanetId, routeForm.toPlanetId, user.navigatorId || user.id);
       setMessage({ type: 'success', text: 'Маршрут успешно создан' });
       setRouteForm({ fromPlanetId: '', toPlanetId: '' });
       loadData();
@@ -1935,24 +1955,22 @@ function NavigatorDashboard({ user }) {
         // Ищем ID навигатора
         const navigatorMatch = content.match(/навигатора ID:\s*(\d+)/);
         navigatorId = navigatorMatch ? parseInt(navigatorMatch[1]) :
-            (user.id || user.navigatorId);
+            (user.navigatorId || user.id);
       } else {
         // Старый способ парсинга
         const oldFromMatch = content.match(/от планеты[^\d]*(\d+)/);
         const oldToMatch = content.match(/к планете[^\d]*(\d+)/);
         fromPlanetId = oldFromMatch ? parseInt(oldFromMatch[1]) : null;
         toPlanetId = oldToMatch ? parseInt(oldToMatch[1]) : null;
-        navigatorId = user.id || user.navigatorId;
+        navigatorId = user.navigatorId || user.id;
       }
 
-      if (fromPlanetId && toPlanetId) {
-        await api.createRoute(fromPlanetId, toPlanetId, navigatorId);
-        await api.markCommandCompleted(messageId);
-        setMessage({ type: 'success', text: 'Маршрут проложен, команда выполнена' });
-        loadData();
-      } else {
-        setMessage({ type: 'error', text: 'Не удалось распознать ID планет' });
-      }
+      // Используем новый API метод для выполнения команды, если ID планет не найдены
+      // или если хотим использовать серверную логику (рекомендуется)
+      await api.executeRouteCommand(messageId);
+      await api.markCommandCompleted(messageId);
+      setMessage({ type: 'success', text: 'Маршрут проложен, команда выполнена' });
+      loadData();
     } catch (error) {
       setMessage({ type: 'error', text: `Ошибка выполнения: ${error.message}` });
     }
@@ -2146,7 +2164,6 @@ function NavigatorDashboard({ user }) {
 function AstropathDashboard({ user }) {
   const [pendingMessages, setPendingMessages] = useState([]);
   const [deliveredMessages, setDeliveredMessages] = useState([]);
-  const [traderCommands, setTraderCommands] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
@@ -2159,35 +2176,26 @@ function AstropathDashboard({ user }) {
   });
 
   useEffect(() => {
-    if (user.id || user.astropathId) {
+    if (user.userId || user.id) {
       loadData();
     }
-  }, [user.id, user.astropathId]);
+  }, [user.userId, user.id]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [usersData, messagesData] = await Promise.all([
+      // Используем ID пользователя (User ID), так как сообщения привязаны к пользователям
+      const userId = user.userId || user.id;
+      
+      const [usersData, pending, delivered] = await Promise.all([
         api.getUsers(),
-        api.getMessagesForUser(user.id || user.userId || user.astropathId)
+        api.getPendingMessagesForAstropath(userId),
+        api.getDeliveredMessagesForAstropath(userId)
       ]);
 
       setUsers(usersData);
-
-      // Фильтруем сообщения
-      const allMessages = messagesData || [];
-      setPendingMessages(allMessages.filter(msg =>
-          msg.receiver && msg.receiver.id === (user.id || user.astropathId) && !msg.delivered
-      ));
-      setDeliveredMessages(allMessages.filter(msg =>
-          msg.sender && msg.sender.id === (user.id || user.astropathId) && msg.delivered
-      ));
-
-      // Команды от торговца
-      setTraderCommands(allMessages.filter(msg =>
-          msg.sender && msg.sender.role === UserRole.TRADER &&
-          msg.receiver && msg.receiver.id === (user.id || user.astropathId)
-      ));
+      setPendingMessages(pending || []);
+      setDeliveredMessages(delivered || []);
     } catch (error) {
       setMessage({ type: 'error', text: `Ошибка загрузки данных: ${error.message}` });
     } finally {
@@ -2197,7 +2205,8 @@ function AstropathDashboard({ user }) {
 
   const handleSendMessage = async (originalMessage, finalReceiverId) => {
     try {
-      const astropathId = user.id || user.astropathId;
+      // Используем ID пользователя (User ID) для отправки
+      const astropathId = user.userId || user.id;
       if (!astropathId) {
         throw new Error('ID астропата не найден');
       }
@@ -2219,7 +2228,6 @@ function AstropathDashboard({ user }) {
       await api.markMessageDelivered(originalMessage.id);
 
       setMessage({ type: 'success', text: 'Сообщение отправлено через варп' });
-      setForwardData({ messageId: '', finalReceiverId: '' });
       loadData();
     } catch (error) {
       setMessage({ type: 'error', text: `Ошибка отправки: ${error.message}` });
@@ -2233,12 +2241,13 @@ function AstropathDashboard({ user }) {
     }
 
     try {
-      const astropathId = user.id || user.astropathId;
+      // Используем ID пользователя (User ID) для пересылки
+      const astropathId = user.userId || user.id;
       if (!astropathId) {
         throw new Error('ID астропата не найден');
       }
 
-      const originalMessage = [...pendingMessages, ...traderCommands]
+      const originalMessage = pendingMessages
           .find(msg => msg.id == forwardData.messageId);
 
       if (!originalMessage) {
@@ -2278,7 +2287,8 @@ function AstropathDashboard({ user }) {
       );
       return governor;
     } else if (msg.messageType === 'NAVIGATION_REQUEST') {
-      return users.find(u => u.role === UserRole.NAVIGATOR);
+      // Используем commandId, где хранится ID навигатора
+      return users.find(u => u.role === UserRole.NAVIGATOR && u.id == msg.commandId);
     }
     return null;
   };
@@ -2323,7 +2333,7 @@ function AstropathDashboard({ user }) {
               <div className="stat-item">
                 <span className="stat-label">Сообщений в очереди:</span>
                 <span className="stat-value" style={{ color: '#ff9800' }}>
-                {pendingMessages.length + traderCommands.length}
+                {pendingMessages.length}
               </span>
               </div>
               <div className="stat-item">
@@ -2347,13 +2357,13 @@ function AstropathDashboard({ user }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '20px' }}>
           <div className="table-container">
             <h3>📥 Входящие сообщения</h3>
-            {pendingMessages.length === 0 && traderCommands.length === 0 ? (
+            {pendingMessages.length === 0 ? (
                 <p style={{ color: '#aaa', textAlign: 'center', padding: '20px' }}>
                   Нет новых сообщений
                 </p>
             ) : (
                 <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                  {[...pendingMessages, ...traderCommands].map(msg => {
+                  {pendingMessages.map(msg => {
                     const recipient = getRecipientForMessage(msg);
                     return (
                         <div
@@ -2403,16 +2413,6 @@ function AstropathDashboard({ user }) {
                                   📨 Отправить {recipient.role === 'GOVERNOR' ? 'губернатору' : 'навигатору'}
                                 </button>
                             )}
-                            <button
-                                className="btn btn-secondary"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setForwardData({...forwardData, messageId: msg.id});
-                                }}
-                                style={{ flex: 1 }}
-                            >
-                              ↩️ Переслать
-                            </button>
                           </div>
                         </div>
                     );
@@ -2421,65 +2421,7 @@ function AstropathDashboard({ user }) {
             )}
           </div>
 
-          <div className="table-container">
-            <h3>📤 Переслать команду</h3>
-            <div className="form-group">
-              <label>Сообщение:</label>
-              <select
-                  value={forwardData.messageId}
-                  onChange={(e) => setForwardData({...forwardData, messageId: e.target.value})}
-                  style={{
-                    padding: '10px',
-                    border: '1px solid #555',
-                    borderRadius: '5px',
-                    background: '#2d2d44',
-                    color: '#e0e0e0',
-                    width: '100%'
-                  }}
-              >
-                <option value="">Выберите сообщение</option>
-                {[...pendingMessages, ...traderCommands].map(msg => (
-                    <option key={msg.id} value={msg.id}>
-                      От {msg.sender?.email}: {msg.content.substring(0, 50)}...
-                    </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label>Конечный получатель:</label>
-              <select
-                  value={forwardData.finalReceiverId}
-                  onChange={(e) => setForwardData({...forwardData, finalReceiverId: e.target.value})}
-                  style={{
-                    padding: '10px',
-                    border: '1px solid #555',
-                    borderRadius: '5px',
-                    background: '#2d2d44',
-                    color: '#e0e0e0',
-                    width: '100%'
-                  }}
-              >
-                <option value="">Выберите получателя</option>
-                {users
-                    .filter(u => u.id !== user.id && (u.role === UserRole.GOVERNOR || u.role === UserRole.NAVIGATOR))
-                    .map(u => (
-                        <option key={u.id} value={u.id}>
-                          {u.email} ({getRoleDisplay(u.role)})
-                        </option>
-                    ))}
-              </select>
-            </div>
-
-            <button
-                className="btn btn-primary"
-                onClick={handleForwardCommand}
-                disabled={!forwardData.messageId || !forwardData.finalReceiverId}
-                style={{ width: '100%', marginTop: '10px' }}
-            >
-              🌌 Переслать через Варп
-            </button>
-          </div>
+          {/* Feature removed */}
         </div>
 
         <div className="table-container" style={{ marginTop: '20px' }}>

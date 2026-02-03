@@ -99,6 +99,8 @@ public class MessageController {
         return ResponseEntity.ok(messageService.markMessageDelivered(messageId));
     }
 
+    // Removed duplicate method
+
     // ==================== МЕТОДЫ ДЛЯ ВЫПОЛНЕНИЯ КОМАНД ====================
 
     @GetMapping("/receiver/{receiverId}/commands")

@@ -3,6 +3,8 @@ package com.example.is_rogue_trader.controller;
 import com.example.is_rogue_trader.dto.CreateRouteRequest;
 import com.example.is_rogue_trader.model.entity.Message;
 import com.example.is_rogue_trader.model.entity.Route;
+import com.example.is_rogue_trader.model.entity.Navigator;
+import com.example.is_rogue_trader.repository.NavigatorRepository;
 import com.example.is_rogue_trader.service.MessageService;
 import com.example.is_rogue_trader.service.RouteService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,6 +27,7 @@ public class NavigatorController {
 
     private final RouteService routeService;
     private final MessageService messageService;
+    private final NavigatorRepository navigatorRepository;
 
     // ==================== МАРШРУТЫ ====================
 
@@ -44,10 +47,20 @@ public class NavigatorController {
             security = @SecurityRequirement(name = "bearerAuth"))
     public ResponseEntity<Route> createRoute(
             @Valid @RequestBody CreateRouteRequest request) {
+        
+        Long navigatorId = request.getNavigatorId();
+        
+        // Если навигатор не найден по ID, ищем по User ID
+        if (!navigatorRepository.existsById(navigatorId)) {
+             Navigator navigator = navigatorRepository.findByUserId(navigatorId)
+                    .orElseThrow(() -> new RuntimeException("Навигатор не найден"));
+             navigatorId = navigator.getId();
+        }
+
         Route route = routeService.createRoute(
                 request.getFromPlanetId(),
                 request.getToPlanetId(),
-                request.getNavigatorId()
+                navigatorId
         );
         return ResponseEntity.ok(route);
     }
@@ -89,10 +102,14 @@ public class NavigatorController {
 
         if (fromPlanetId != null && toPlanetId != null) {
             try {
+                // Находим навигатора по ID пользователя (получателя сообщения)
+                Navigator navigator = navigatorRepository.findByUserId(message.getReceiver().getId())
+                        .orElseThrow(() -> new RuntimeException("Навигатор не найден"));
+
                 route = routeService.createRoute(
                         fromPlanetId,
                         toPlanetId,
-                        message.getReceiver().getId() // ID навигатора
+                        navigator.getId()
                 );
                 resultMessage = "Маршрут успешно проложен";
             } catch (Exception e) {
