@@ -5,7 +5,11 @@ import com.example.is_rogue_trader.model.entity.Planet;
 import com.example.is_rogue_trader.model.entity.RogueTrader;
 import com.example.is_rogue_trader.model.enums.EventType;
 import com.example.is_rogue_trader.model.enums.ProjectStatus;
-import com.example.is_rogue_trader.repository.*;
+import com.example.is_rogue_trader.repository.EventRepository;
+import com.example.is_rogue_trader.repository.MessageRepository;
+import com.example.is_rogue_trader.repository.PlanetRepository;
+import com.example.is_rogue_trader.repository.ProjectRepository;
+import com.example.is_rogue_trader.repository.RogueTraderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,12 +25,18 @@ public class TimeService {
     private final PlanetRepository planetRepository;
     private final EventRepository eventRepository;
     private final ProjectRepository projectRepository;
-    private final RogueTraderRepository rogueTraderRepository; // Добавляем этот репозиторий
+    private final RogueTraderRepository rogueTraderRepository;
+    private final MessageRepository messageRepository;
 
     private final Random random = new Random();
 
     @Transactional
     public void advanceTimeCycle(Long traderId) {
+        // Перед продвижением времени проверяем наличие невыполненных команд
+        if (messageRepository.existsUncompletedCommands()) {
+            throw new IllegalArgumentException("Нельзя пропустить время: есть невыполненные команды!");
+        }
+
         // 1. Сбор налогов с планет
         collectTaxes(traderId);
 

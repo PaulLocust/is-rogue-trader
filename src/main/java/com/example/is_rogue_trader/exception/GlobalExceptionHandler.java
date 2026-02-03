@@ -17,6 +17,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleRuntimeException(RuntimeException e) {
         Map<String, String> error = new HashMap<>();
         error.put("error", e.getMessage());
+        error.put("message", e.getMessage());
         error.put("status", "error");
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
     }
@@ -25,6 +26,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException e) {
         Map<String, String> error = new HashMap<>();
         error.put("error", e.getMessage());
+        error.put("message", e.getMessage());
         error.put("status", "error");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }

@@ -20,12 +20,10 @@ public class Route {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "from_planet_id", nullable = false)
-    @JsonIgnore
     private Planet fromPlanet;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "to_planet_id", nullable = false)
-    @JsonIgnore
     private Planet toPlanet;
 
     @ManyToOne(fetch = FetchType.LAZY)

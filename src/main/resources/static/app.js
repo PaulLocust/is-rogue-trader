@@ -822,7 +822,8 @@ function TraderDashboard({ user }) {
   };
 
   const handleCreateUpgradeCommand = async () => {
-    if (!newCommand.receiverId || !newCommand.planetId || !newCommand.upgradeId) {
+    // Проверяем только реально используемые поля
+    if (!newCommand.planetId || !newCommand.upgradeId) {
       setMessage({ type: 'error', text: 'Заполните все поля!' });
       return;
     }
@@ -923,11 +924,15 @@ function TraderDashboard({ user }) {
         throw new Error('ID пользователя не найден');
       }
 
-      const content = `Прокладка варп-маршрута от планеты ${fromPlanet.name} к планете ${toPlanet.name}`;
+      // Включаем ID планет в текст, чтобы навигатор мог распознать команду
+      const content =
+          `Прокладка варп-маршрута от планеты ${fromPlanet.id} (${fromPlanet.name}) ` +
+          `к планете ${toPlanet.id} (${toPlanet.name})`;
 
+      // Отправляем команду не напрямую навигатору, а астропату
       await api.sendMessage(
           senderId,
-          routeData.navigatorId,
+          findAstropathId(),
           content,
           MessageType.NAVIGATION_REQUEST,
           null,
@@ -2034,8 +2039,6 @@ function NavigatorDashboard({ user }) {
                   <th>От</th>
                   <th>К</th>
                   <th>Стабильность</th>
-                  <th>Длина</th>
-                  <th>Действия</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -2057,23 +2060,6 @@ function NavigatorDashboard({ user }) {
                     <span className={`status-badge ${route.isStable ? 'status-loyal' : 'status-rebellious'}`}>
                       {route.isStable ? '✅ Стабильный' : '⚠️ Нестабильный'}
                     </span>
-                      </td>
-                      <td>
-                        {Math.floor(Math.random() * 1000) + 100} св. лет
-                      </td>
-                      <td>
-                        <button
-                            className="btn btn-secondary"
-                            onClick={() => {
-                              setRouteForm({
-                                fromPlanetId: route.fromPlanetId || route.fromPlanet?.id,
-                                toPlanetId: route.toPlanetId || route.toPlanet?.id
-                              });
-                            }}
-                            style={{ padding: '4px 8px', fontSize: '11px' }}
-                        >
-                          👁️ Просмотр
-                        </button>
                       </td>
                     </tr>
                 ))}

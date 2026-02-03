@@ -35,4 +35,8 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     @Query("SELECT m FROM Message m WHERE m.receiver.id = :userId ORDER BY m.sentAt DESC")
     List<Message> findByReceiverId(@Param("userId") Long userId);
+
+    @Query("SELECT COUNT(m) > 0 FROM Message m " +
+           "WHERE m.completed = false AND m.messageType IN ('NAVIGATION_REQUEST', 'UPGRADE_REQUEST', 'CRISIS_RESPONSE')")
+    boolean existsUncompletedCommands();
 }

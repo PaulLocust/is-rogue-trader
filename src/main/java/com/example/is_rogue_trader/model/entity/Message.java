@@ -24,12 +24,10 @@ public class Message {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sender_id", nullable = false)
-    @JsonIgnore
     private User sender;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "receiver_id", nullable = false)
-    @JsonIgnore
     private User receiver;
 
     @Column(nullable = false, columnDefinition = "TEXT")
