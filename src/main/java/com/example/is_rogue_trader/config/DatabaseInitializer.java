@@ -28,6 +28,7 @@ public class DatabaseInitializer {
 
         try (Connection connection = dataSource.getConnection()) {
             // Выполняем каждый скрипт с детальным логированием
+            //executeScriptManually(connection, "sql/reset_db.sql");
             executeScriptManually(connection, "sql/schema.sql");
             executeScriptManually(connection, "sql/functions.sql");
             executeScriptManually(connection, "sql/triggers.sql");
