@@ -715,6 +715,7 @@ function TraderDashboard({ user }) {
     receiverId: '',
     planetId: '',
     upgradeId: '',
+    astropathId: '',
     resourcesWealth: 0,
     resourcesIndustry: 0,
     resourcesResources: 0,
@@ -727,7 +728,8 @@ function TraderDashboard({ user }) {
   const [routeData, setRouteData] = useState({
     fromPlanetId: '',
     toPlanetId: '',
-    navigatorId: ''
+    navigatorId: '',
+    astropathId: ''
   });
 
   useEffect(() => {
@@ -828,9 +830,9 @@ function TraderDashboard({ user }) {
   };
 
   const handleCreateUpgradeCommand = async () => {
-    // Проверяем только реально используемые поля
-    if (!newCommand.planetId || !newCommand.upgradeId) {
-      setMessage({ type: 'error', text: 'Заполните все поля!' });
+    // Проверяем ВСЕ необходимые поля, включая астропата
+    if (!newCommand.planetId || !newCommand.upgradeId || !newCommand.astropathId) {
+      setMessage({ type: 'error', text: 'Заполните все поля, включая выбор астропата!' });
       return;
     }
 
@@ -841,18 +843,13 @@ function TraderDashboard({ user }) {
       const content = `Постройка улучшения "${upgrade.name}" на планете ${planet.name}. ` +
           `Стоимость: 💰${upgrade.costWealth} ⚙️${upgrade.costIndustry} ⛏️${upgrade.costResources}`;
 
-      // Отправляем команду астропату
-      const senderId = user.id || user.userId;
-      if (!senderId) {
-        throw new Error('ID пользователя не найден');
-      }
-
+      // Отправляем команду ВЫБРАННОМУ астропату
       await api.sendMessage(
-          senderId,
-          findAstropathId(),
+          user.id || user.userId,
+          newCommand.astropathId,  // <-- ВАЖНО: используем выбранного астропата
           content,
           MessageType.UPGRADE_REQUEST,
-          null,
+          newCommand.planetId,  // commandId = planetId
           upgrade.costWealth,
           upgrade.costIndustry,
           upgrade.costResources,
@@ -861,11 +858,13 @@ function TraderDashboard({ user }) {
 
       setMessage({ type: 'success', text: 'Команда на улучшение отправлена астропату' });
       setShowCreateCommandModal(false);
+      // Сброс формы
       setNewCommand({
         type: 'UPGRADE_REQUEST',
         receiverId: '',
         planetId: '',
         upgradeId: '',
+        astropathId: '',  // <-- сброс ID астропата
         resourcesWealth: 0,
         resourcesIndustry: 0,
         resourcesResources: 0,
@@ -877,8 +876,15 @@ function TraderDashboard({ user }) {
     }
   };
 
+  // В состоянии TraderDashboard добавьте:
+  const [crisisAstropathId, setCrisisAstropathId] = useState('');
+
+// Обновите handleResolveCrisis:
   const handleResolveCrisis = async (action) => {
-    if (!selectedEvent) return;
+    if (!selectedEvent || !crisisAstropathId) {  // <-- Проверяем выбран ли астропат
+      setMessage({ type: 'error', text: 'Выберите астропата!' });
+      return;
+    }
 
     try {
       const senderId = user.id || user.userId;
@@ -893,7 +899,7 @@ function TraderDashboard({ user }) {
 
       await api.sendMessage(
           senderId,
-          findAstropathId(),
+          crisisAstropathId,  // <-- Используем выбранного астропата
           content,
           MessageType.CRISIS_RESPONSE,
           selectedEvent.id,
@@ -909,6 +915,7 @@ function TraderDashboard({ user }) {
       });
       setShowCrisisModal(false);
       setSelectedEvent(null);
+      setCrisisAstropathId('');  // <-- Сброс ID астропата
       loadData();
     } catch (error) {
       setMessage({ type: 'error', text: `Ошибка: ${error.message}` });
@@ -916,8 +923,10 @@ function TraderDashboard({ user }) {
   };
 
   const handleCreateRouteCommand = async () => {
-    if (!routeData.fromPlanetId || !routeData.toPlanetId || !routeData.navigatorId) {
-      setMessage({ type: 'error', text: 'Выберите планеты и навигатора!' });
+    // Проверяем ВСЕ поля включая астропата
+    if (!routeData.fromPlanetId || !routeData.toPlanetId ||
+        !routeData.navigatorId || !routeData.astropathId) {
+      setMessage({ type: 'error', text: 'Выберите планеты, навигатора и астропата!' });
       return;
     }
 
@@ -932,35 +941,31 @@ function TraderDashboard({ user }) {
 
       // Включаем ID планет в текст, чтобы навигатор мог распознать команду
       const content =
-          `Прокладка варп-маршрута от планеты ${fromPlanet.id} (${fromPlanet.name}) ` +
-          `к планете ${toPlanet.id} (${toPlanet.name})`;
+          `Прокладка варп-маршрута от планеты ${fromPlanet.name} (ID: ${fromPlanet.id}) ` +
+          `к планете ${toPlanet.name} (ID: ${toPlanet.id}) для навигатора ID: ${routeData.navigatorId}`;
 
-      // Отправляем команду не напрямую навигатору, а астропату
+      // Отправляем команду ВЫБРАННОМУ астропату
       await api.sendMessage(
           senderId,
-          findAstropathId(),
+          routeData.astropathId,  // <-- ВАЖНО: используем выбранного астропата
           content,
           MessageType.NAVIGATION_REQUEST,
-          null,
+          routeData.navigatorId,  // commandId = navigatorId
           0, 0, 0, 0.1
       );
 
-      setMessage({ type: 'success', text: 'Команда на прокладку маршрута отправлена' });
+      setMessage({ type: 'success', text: 'Команда на прокладку маршрута отправлена астропату' });
       setShowRouteModal(false);
       setRouteData({
         fromPlanetId: '',
         toPlanetId: '',
-        navigatorId: ''
+        navigatorId: '',
+        astropathId: ''
       });
       loadData();
     } catch (error) {
       setMessage({ type: 'error', text: `Ошибка: ${error.message}` });
     }
-  };
-
-  const findAstropathId = () => {
-    const astropath = users.find(u => u.role === UserRole.ASTROPATH);
-    return astropath ? astropath.id : null;
   };
 
   const getCompletedCommandsCount = () => {
@@ -1099,7 +1104,7 @@ function TraderDashboard({ user }) {
                             value={newCommand.planetId}
                             onChange={(e) => {
                               const planetId = e.target.value;
-                              setNewCommand({ ...newCommand, planetId });
+                              setNewCommand({...newCommand, planetId});
                             }}
                         >
                           <option value="">Выберите планету</option>
@@ -1114,17 +1119,36 @@ function TraderDashboard({ user }) {
                             <label>Улучшение:</label>
                             <select
                                 value={newCommand.upgradeId}
-                                onChange={(e) => setNewCommand({ ...newCommand, upgradeId: e.target.value })}
+                                onChange={(e) => setNewCommand({...newCommand, upgradeId: e.target.value})}
                             >
                               <option value="">Выберите улучшение</option>
                               {upgrades
                                   .filter(u => u.suitableTypes === planets.find(p => p.id == newCommand.planetId)?.planetType)
                                   .map(u => (
-                                      <option key={u.id} value={u.id}>{u.name} (💰{u.costWealth} ⚙️{u.costIndustry} ⛏️{u.costResources})</option>
+                                      <option key={u.id}
+                                              value={u.id}>{u.name} (💰{u.costWealth} ⚙️{u.costIndustry} ⛏️{u.costResources})</option>
                                   ))}
                             </select>
                           </div>
                       )}
+
+                      <div className="form-group">
+                        <label>Астропат для отправки:</label>
+                        <select
+                            value={newCommand.astropathId}
+                            onChange={(e) => setNewCommand({...newCommand, astropathId: e.target.value})}
+                            required
+                        >
+                          <option value="">Выберите астропата</option>
+                          {users
+                              .filter(u => u.role === UserRole.ASTROPATH)
+                              .map(u => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.email} (Уровень пси: {u.psiLevel || 5})
+                                  </option>
+                              ))}
+                        </select>
+                      </div>
                     </>
                 )}
 
@@ -1164,17 +1188,20 @@ function TraderDashboard({ user }) {
                   <input
                       type="number"
                       value={crisisResources.industry}
-                      onChange={(e) => setCrisisResources({...crisisResources, industry: parseInt(e.target.value) || 0})}
+                      onChange={(e) => setCrisisResources({
+                        ...crisisResources,
+                        industry: parseInt(e.target.value) || 0
+                      })}
                       min="0"
                   />
                 </div>
 
                 <div className="modal-actions">
                   <button className="btn btn-primary" onClick={() => handleResolveCrisis('HELP')}>
-                    🤝 Помочь (выделить ресурсы)
+                    Помочь (выделить ресурсы)
                   </button>
                   <button className="btn btn-danger" onClick={() => handleResolveCrisis('IGNORE')}>
-                    🙈 Игнорировать
+                    Игнорировать
                   </button>
                   <button className="btn btn-secondary" onClick={() => {
                     setShowCrisisModal(false);
@@ -1182,6 +1209,24 @@ function TraderDashboard({ user }) {
                   }}>
                     Отмена
                   </button>
+                </div>
+
+                <div className="form-group">
+                  <label>Астропат для отправки:</label>
+                  <select
+                      value={crisisAstropathId}
+                      onChange={(e) => setCrisisAstropathId(e.target.value)}
+                      required
+                  >
+                    <option value="">Выберите астропата</option>
+                    {users
+                        .filter(u => u.role === UserRole.ASTROPATH)
+                        .map(u => (
+                            <option key={u.id} value={u.id}>
+                              {u.email} (Уровень пси: {u.psiLevel || 5})
+                            </option>
+                        ))}
+                  </select>
                 </div>
               </div>
             </div>
@@ -1236,6 +1281,24 @@ function TraderDashboard({ user }) {
                   </select>
                 </div>
 
+                <div className="form-group">
+                  <label>Астропат для отправки:</label>
+                  <select
+                      value={routeData.astropathId}
+                      onChange={(e) => setRouteData({...routeData, astropathId: e.target.value})}
+                      required
+                  >
+                    <option value="">Выберите астропата</option>
+                    {users
+                        .filter(u => u.role === UserRole.ASTROPATH)
+                        .map(u => (
+                            <option key={u.id} value={u.id}>
+                              {u.email} (Уровень пси: {u.psiLevel || 5})
+                            </option>
+                        ))}
+                  </select>
+                </div>
+
                 <div className="modal-actions">
                   <button className="btn btn-primary" onClick={handleCreateRouteCommand}>
                     📨 Отправить команду
@@ -1255,7 +1318,8 @@ function TraderDashboard({ user }) {
                 <div className="card-content">
                   <div className="stat-item">
                     <span className="stat-label">Богатство:</span>
-                    <span className="stat-value">💰{empireResources.totalWealth ? empireResources.totalWealth.toFixed(2) : '0'}</span>
+                    <span
+                        className="stat-value">💰{empireResources.totalWealth ? empireResources.totalWealth.toFixed(2) : '0'}</span>
                   </div>
                   <div className="stat-item">
                     <span className="stat-label">Промышленность:</span>
@@ -1856,37 +1920,38 @@ function NavigatorDashboard({ user }) {
       const command = commands.find(cmd => cmd.id === messageId);
       if (!command) return;
 
-      // Парсим команду для получения ID планет
       const content = command.content;
-      const fromPlanetMatch = content.match(/от планеты (\d+)/);
-      const toPlanetMatch = content.match(/к планете (\d+)/);
 
-      if (fromPlanetMatch && toPlanetMatch) {
-        const fromPlanetId = parseInt(fromPlanetMatch[1]);
-        const toPlanetId = parseInt(toPlanetMatch[1]);
+      // Улучшенный парсинг - ищем ID планет и навигатора
+      const planetIdRegex = /ID:\s*(\d+)/g;
+      const matches = [...content.matchAll(planetIdRegex)];
 
-        await api.createRoute(fromPlanetId, toPlanetId, user.id || user.navigatorId);
+      let fromPlanetId, toPlanetId, navigatorId;
 
-        // Помечаем команду как выполненную
+      if (matches.length >= 2) {
+        fromPlanetId = parseInt(matches[0][1]);
+        toPlanetId = parseInt(matches[1][1]);
+
+        // Ищем ID навигатора
+        const navigatorMatch = content.match(/навигатора ID:\s*(\d+)/);
+        navigatorId = navigatorMatch ? parseInt(navigatorMatch[1]) :
+            (user.id || user.navigatorId);
+      } else {
+        // Старый способ парсинга
+        const oldFromMatch = content.match(/от планеты[^\d]*(\d+)/);
+        const oldToMatch = content.match(/к планете[^\d]*(\d+)/);
+        fromPlanetId = oldFromMatch ? parseInt(oldFromMatch[1]) : null;
+        toPlanetId = oldToMatch ? parseInt(oldToMatch[1]) : null;
+        navigatorId = user.id || user.navigatorId;
+      }
+
+      if (fromPlanetId && toPlanetId) {
+        await api.createRoute(fromPlanetId, toPlanetId, navigatorId);
         await api.markCommandCompleted(messageId);
-
-        // Отправляем отчет астропату
-        const astropath = commands.find(cmd => cmd.sender?.role === UserRole.ASTROPATH)?.sender;
-        if (astropath) {
-          await api.sendMessage(
-              user.id || user.userId,
-              astropath.id,
-              'Маршрут успешно проложен',
-              MessageType.STATUS_UPDATE,
-              messageId,
-              0, 0, 0, 0.1
-          );
-        }
-
         setMessage({ type: 'success', text: 'Маршрут проложен, команда выполнена' });
         loadData();
       } else {
-        setMessage({ type: 'error', text: 'Не удалось распознать команду' });
+        setMessage({ type: 'error', text: 'Не удалось распознать ID планет' });
       }
     } catch (error) {
       setMessage({ type: 'error', text: `Ошибка выполнения: ${error.message}` });
