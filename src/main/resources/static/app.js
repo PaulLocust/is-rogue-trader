@@ -12,11 +12,11 @@ const UserRole = {
 
 // Message Types
 const MessageType = {
+  NAVIGATION_REQUEST: 'NAVIGATION_REQUEST',
   UPGRADE_REQUEST: 'UPGRADE_REQUEST',
   CRISIS_RESPONSE: 'CRISIS_RESPONSE',
-  ROUTE_REQUEST: 'ROUTE_REQUEST',
-  STATUS_UPDATE: 'STATUS_UPDATE',
-  REPORT: 'REPORT'
+  RESOURCES_TRANSFER: 'RESOURCES_TRANSFER',    // Для отправки налогов/ресурсов
+  STATUS_UPDATE: 'STATUS_UPDATE'               // Для отчетов
 };
 
 // API Client
@@ -103,19 +103,21 @@ const api = {
   },
 
   // Messages
-  async sendMessage(senderId, receiverId, content, messageType, commandId, resourcesWealth = 0, resourcesIndustry = 0, resourcesResources = 0, distortionChance = 0.1) {
+  async sendMessage(senderId, receiverId, content, messageType, commandId = null, resourcesWealth = 0, resourcesIndustry = 0, resourcesResources = 0, distortionChance = 0.1) {
+    const messageTypeValue = typeof messageType === 'string' ? messageType : messageType;
+
     return this.request('/messages', {
       method: 'POST',
       body: JSON.stringify({
-        senderId,
-        receiverId,
+        senderId: parseInt(senderId),
+        receiverId: parseInt(receiverId),
         content,
-        messageType,
+        messageType: messageTypeValue,
         commandId,
-        resourcesWealth,
-        resourcesIndustry,
-        resourcesResources,
-        distortionChance
+        resourcesWealth: resourcesWealth ? parseFloat(resourcesWealth) : 0,
+        resourcesIndustry: resourcesIndustry ? parseFloat(resourcesIndustry) : 0,
+        resourcesResources: resourcesResources ? parseFloat(resourcesResources) : 0,
+        distortionChance: distortionChance ? parseFloat(distortionChance) : 0.1
       }),
     });
   },
@@ -502,7 +504,7 @@ function EmpireMap({ planets, routes, onPlanetClick, showDetails = true, interac
   );
 }
 
-// Auth Component (без изменений)
+// Auth Component
 function Auth({ onLogin }) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -676,7 +678,7 @@ function Auth({ onLogin }) {
   );
 }
 
-
+// Trader Dashboard Component с добавленной кнопкой создания планет
 function TraderDashboard({ user }) {
   const [empireResources, setEmpireResources] = useState(null);
   const [planets, setPlanets] = useState([]);
@@ -740,7 +742,7 @@ function TraderDashboard({ user }) {
         api.getTraderEvents(user.traderId),
         api.getUpgrades(),
         api.getUsers(),
-        api.getMessagesForUser(user.id || user.traderId)
+        api.getMessagesForUser(user.id || user.userId || user.traderId)
       ]);
       setEmpireResources(resources);
       setPlanets(planetsData);
@@ -750,7 +752,7 @@ function TraderDashboard({ user }) {
 
       // Фильтруем команды, созданные торговцем
       const traderCommands = messages.filter(msg =>
-          msg.sender && msg.sender.id === user.id
+          msg.sender && (msg.sender.id === user.id || msg.sender.id === user.userId)
       );
       setCommands(traderCommands);
     } catch (error) {
@@ -786,6 +788,39 @@ function TraderDashboard({ user }) {
     setSelectedPlanet(planet);
   };
 
+  const handleCreatePlanet = async () => {
+    try {
+      if (!newPlanet.name.trim()) {
+        setMessage({ type: 'error', text: 'Введите название планеты' });
+        return;
+      }
+
+      await api.createPlanet(
+          user.traderId,
+          newPlanet.name,
+          newPlanet.planetType,
+          parseFloat(newPlanet.loyalty),
+          parseFloat(newPlanet.wealth),
+          parseFloat(newPlanet.industry),
+          parseFloat(newPlanet.resources)
+      );
+
+      setMessage({ type: 'success', text: 'Планета успешно создана!' });
+      setShowCreatePlanetModal(false);
+      setNewPlanet({
+        name: '',
+        planetType: 'AGRI_WORLD',
+        loyalty: '50.0',
+        wealth: '0',
+        industry: '0',
+        resources: '0'
+      });
+      loadData();
+    } catch (error) {
+      setMessage({ type: 'error', text: `Ошибка создания планеты: ${error.message}` });
+    }
+  };
+
   const handleCreateUpgradeCommand = async () => {
     if (!newCommand.receiverId || !newCommand.planetId || !newCommand.upgradeId) {
       setMessage({ type: 'error', text: 'Заполните все поля!' });
@@ -800,8 +835,13 @@ function TraderDashboard({ user }) {
           `Стоимость: 💰${upgrade.costWealth} ⚙️${upgrade.costIndustry} ⛏️${upgrade.costResources}`;
 
       // Отправляем команду астропату
+      const senderId = user.id || user.userId;
+      if (!senderId) {
+        throw new Error('ID пользователя не найден');
+      }
+
       await api.sendMessage(
-          user.id,
+          senderId,
           findAstropathId(),
           content,
           MessageType.UPGRADE_REQUEST,
@@ -834,13 +874,18 @@ function TraderDashboard({ user }) {
     if (!selectedEvent) return;
 
     try {
+      const senderId = user.id || user.userId;
+      if (!senderId) {
+        throw new Error('ID пользователя не найден');
+      }
+
       // Отправляем команду астропату
       const content = action === 'HELP'
           ? `Разрешение кризиса на планете ${selectedEvent.planet?.name}. Выделено ресурсов: 💰${crisisResources.wealth} ⚙️${crisisResources.industry}`
           : `Игнорирование кризиса на планете ${selectedEvent.planet?.name}`;
 
       await api.sendMessage(
-          user.id,
+          senderId,
           findAstropathId(),
           content,
           MessageType.CRISIS_RESPONSE,
@@ -872,14 +917,19 @@ function TraderDashboard({ user }) {
     try {
       const fromPlanet = planets.find(p => p.id == routeData.fromPlanetId);
       const toPlanet = planets.find(p => p.id == routeData.toPlanetId);
+      const senderId = user.id || user.userId;
+
+      if (!senderId) {
+        throw new Error('ID пользователя не найден');
+      }
 
       const content = `Прокладка варп-маршрута от планеты ${fromPlanet.name} к планете ${toPlanet.name}`;
 
       await api.sendMessage(
-          user.id,
+          senderId,
           routeData.navigatorId,
           content,
-          MessageType.ROUTE_REQUEST,
+          MessageType.NAVIGATION_REQUEST,
           null,
           0, 0, 0, 0.1
       );
@@ -919,6 +969,99 @@ function TraderDashboard({ user }) {
         {message && (
             <div className={`message message-${message.type}`}>
               {message.text}
+            </div>
+        )}
+
+        {/* Модальное окно создания планеты */}
+        {showCreatePlanetModal && (
+            <div className="modal-overlay">
+              <div className="modal-content">
+                <h3>🌍 Создать новую планету</h3>
+
+                <div className="form-group">
+                  <label>Название планеты:</label>
+                  <input
+                      type="text"
+                      value={newPlanet.name}
+                      onChange={(e) => setNewPlanet({...newPlanet, name: e.target.value})}
+                      placeholder="Введите название планеты"
+                      required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Тип планеты:</label>
+                  <select
+                      value={newPlanet.planetType}
+                      onChange={(e) => setNewPlanet({...newPlanet, planetType: e.target.value})}
+                  >
+                    <option value="AGRI_WORLD">🌾 Аграрный Мир</option>
+                    <option value="FORGE_WORLD">⚒️ Кузнечный Мир</option>
+                    <option value="MINING_WORLD">⛏️ Горнодобывающий Мир</option>
+                    <option value="CIVILIZED_WORLD">🏛️ Цивилизованный Мир</option>
+                    <option value="DEATH_WORLD">☠️ Мир Смерти</option>
+                    <option value="HIVE_WORLD">🏙️ Улей Мир</option>
+                    <option value="FEUDAL_WORLD">⚔️ Феодальный Мир</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div className="form-group">
+                    <label>Лояльность (0-100):</label>
+                    <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={newPlanet.loyalty}
+                        onChange={(e) => setNewPlanet({...newPlanet, loyalty: e.target.value})}
+                        required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Богатство:</label>
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={newPlanet.wealth}
+                        onChange={(e) => setNewPlanet({...newPlanet, wealth: e.target.value})}
+                        required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Промышленность:</label>
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={newPlanet.industry}
+                        onChange={(e) => setNewPlanet({...newPlanet, industry: e.target.value})}
+                        required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Ресурсы:</label>
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={newPlanet.resources}
+                        onChange={(e) => setNewPlanet({...newPlanet, resources: e.target.value})}
+                        required
+                    />
+                  </div>
+                </div>
+
+                <div className="modal-actions">
+                  <button className="btn btn-primary" onClick={handleCreatePlanet}>
+                    🚀 Создать Планету
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setShowCreatePlanetModal(false)}>
+                    Отмена
+                  </button>
+                </div>
+              </div>
             </div>
         )}
 
@@ -1158,6 +1301,9 @@ function TraderDashboard({ user }) {
         </div>
 
         <div className="dashboard" style={{ marginTop: '20px' }}>
+          <button className="btn btn-primary" onClick={() => setShowCreatePlanetModal(true)}>
+            🌍 Создать Планету
+          </button>
           <button className="btn btn-primary" onClick={() => setShowCreateCommandModal(true)}>
             🏗️ Создать улучшение
           </button>
@@ -1345,7 +1491,7 @@ function TraderDashboard({ user }) {
   );
 }
 
-// Governor Dashboard Component (ИСПРАВЛЕННЫЙ)
+// Governor Dashboard Component
 function GovernorDashboard({ user }) {
   const [planet, setPlanet] = useState(null);
   const [commands, setCommands] = useState([]);
@@ -1364,7 +1510,7 @@ function GovernorDashboard({ user }) {
     try {
       const [planetData, commandsData, upgradesData] = await Promise.all([
         api.getPlanet(user.planetId),
-        api.getCommandsForReceiver(user.id),
+        api.getCommandsForReceiver(user.id || user.userId),
         api.getUpgrades()
       ]);
       setPlanet(planetData);
@@ -1392,7 +1538,7 @@ function GovernorDashboard({ user }) {
       const astropath = commands.find(cmd => cmd.sender?.role === UserRole.ASTROPATH)?.sender;
       if (astropath) {
         await api.sendMessage(
-            user.id,
+            user.id || user.userId,
             astropath.id,
             'Команда выполнена успешно',
             MessageType.STATUS_UPDATE,
@@ -1415,15 +1561,20 @@ function GovernorDashboard({ user }) {
       const content = `Отправлены налоги с планеты ${planet.name}: 💰${taxAmount.toFixed(2)}`;
 
       // Находим астропата
-      const commandsData = await api.getCommandsForReceiver(user.id);
+      const commandsData = await api.getCommandsForReceiver(user.id || user.userId);
       const astropath = commandsData.find(cmd => cmd.sender?.role === UserRole.ASTROPATH)?.sender;
 
       if (astropath) {
+        const senderId = user.id || user.userId;
+        if (!senderId) {
+          throw new Error('ID пользователя не найден');
+        }
+
         await api.sendMessage(
-            user.id,
+            senderId,
             astropath.id,
             content,
-            MessageType.REPORT,
+            MessageType.RESOURCES_TRANSFER,
             null,
             taxAmount,
             0, 0, 0.1
@@ -1636,7 +1787,7 @@ function GovernorDashboard({ user }) {
   );
 }
 
-// Navigator Dashboard Component (ИСПРАВЛЕННЫЙ)
+// Navigator Dashboard Component
 function NavigatorDashboard({ user }) {
   const [planets, setPlanets] = useState([]);
   const [routes, setRoutes] = useState([]);
@@ -1650,18 +1801,18 @@ function NavigatorDashboard({ user }) {
   });
 
   useEffect(() => {
-    if (user.id) {
+    if (user.id || user.navigatorId) {
       loadData();
     }
-  }, [user.id]);
+  }, [user.id, user.navigatorId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [planetsData, routesData, commandsData] = await Promise.all([
         api.getAllPlanets(),
-        api.getRoutes(user.id),
-        api.getCommandsForReceiver(user.id)
+        api.getRoutes(user.id || user.navigatorId),
+        api.getCommandsForReceiver(user.id || user.userId || user.navigatorId)
       ]);
       setPlanets(planetsData);
       setRoutes(routesData);
@@ -1680,7 +1831,7 @@ function NavigatorDashboard({ user }) {
     }
 
     try {
-      await api.createRoute(routeForm.fromPlanetId, routeForm.toPlanetId, user.id);
+      await api.createRoute(routeForm.fromPlanetId, routeForm.toPlanetId, user.id || user.navigatorId);
       setMessage({ type: 'success', text: 'Маршрут успешно создан' });
       setRouteForm({ fromPlanetId: '', toPlanetId: '' });
       loadData();
@@ -1703,7 +1854,7 @@ function NavigatorDashboard({ user }) {
         const fromPlanetId = parseInt(fromPlanetMatch[1]);
         const toPlanetId = parseInt(toPlanetMatch[1]);
 
-        await api.createRoute(fromPlanetId, toPlanetId, user.id);
+        await api.createRoute(fromPlanetId, toPlanetId, user.id || user.navigatorId);
 
         // Помечаем команду как выполненную
         await api.markCommandCompleted(messageId);
@@ -1712,7 +1863,7 @@ function NavigatorDashboard({ user }) {
         const astropath = commands.find(cmd => cmd.sender?.role === UserRole.ASTROPATH)?.sender;
         if (astropath) {
           await api.sendMessage(
-              user.id,
+              user.id || user.userId,
               astropath.id,
               'Маршрут успешно проложен',
               MessageType.STATUS_UPDATE,
@@ -1934,7 +2085,7 @@ function NavigatorDashboard({ user }) {
   );
 }
 
-// Astropath Dashboard Component (ИСПРАВЛЕННЫЙ - с передачей команд)
+// Astropath Dashboard Component
 function AstropathDashboard({ user }) {
   const [pendingMessages, setPendingMessages] = useState([]);
   const [deliveredMessages, setDeliveredMessages] = useState([]);
@@ -1951,17 +2102,17 @@ function AstropathDashboard({ user }) {
   });
 
   useEffect(() => {
-    if (user.id) {
+    if (user.id || user.astropathId) {
       loadData();
     }
-  }, [user.id]);
+  }, [user.id, user.astropathId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [usersData, messagesData] = await Promise.all([
         api.getUsers(),
-        api.getMessagesForUser(user.id)
+        api.getMessagesForUser(user.id || user.userId || user.astropathId)
       ]);
 
       setUsers(usersData);
@@ -1969,16 +2120,16 @@ function AstropathDashboard({ user }) {
       // Фильтруем сообщения
       const allMessages = messagesData || [];
       setPendingMessages(allMessages.filter(msg =>
-          msg.receiver && msg.receiver.id === user.id && !msg.delivered
+          msg.receiver && msg.receiver.id === (user.id || user.astropathId) && !msg.delivered
       ));
       setDeliveredMessages(allMessages.filter(msg =>
-          msg.sender && msg.sender.id === user.id && msg.delivered
+          msg.sender && msg.sender.id === (user.id || user.astropathId) && msg.delivered
       ));
 
       // Команды от торговца
       setTraderCommands(allMessages.filter(msg =>
           msg.sender && msg.sender.role === UserRole.TRADER &&
-          msg.receiver && msg.receiver.id === user.id
+          msg.receiver && msg.receiver.id === (user.id || user.astropathId)
       ));
     } catch (error) {
       setMessage({ type: 'error', text: `Ошибка загрузки данных: ${error.message}` });
@@ -1989,9 +2140,14 @@ function AstropathDashboard({ user }) {
 
   const handleSendMessage = async (originalMessage, finalReceiverId) => {
     try {
+      const astropathId = user.id || user.astropathId;
+      if (!astropathId) {
+        throw new Error('ID астропата не найден');
+      }
+
       // Отправляем сообщение конечному получателю
       await api.astropathSendMessage(
-          user.id,
+          astropathId,
           finalReceiverId,
           originalMessage.content,
           originalMessage.messageType,
@@ -2020,6 +2176,11 @@ function AstropathDashboard({ user }) {
     }
 
     try {
+      const astropathId = user.id || user.astropathId;
+      if (!astropathId) {
+        throw new Error('ID астропата не найден');
+      }
+
       const originalMessage = [...pendingMessages, ...traderCommands]
           .find(msg => msg.id == forwardData.messageId);
 
@@ -2028,7 +2189,7 @@ function AstropathDashboard({ user }) {
       }
 
       await api.forwardCommand(
-          user.id,
+          astropathId,
           forwardData.messageId,
           forwardData.finalReceiverId
       );
@@ -2059,7 +2220,7 @@ function AstropathDashboard({ user }) {
           u.role === UserRole.GOVERNOR && u.planetId == planetId
       );
       return governor;
-    } else if (msg.messageType === 'ROUTE_REQUEST') {
+    } else if (msg.messageType === 'NAVIGATION_REQUEST') {
       return users.find(u => u.role === UserRole.NAVIGATOR);
     }
     return null;
@@ -2394,11 +2555,11 @@ function getPlanetTypeDisplay(type) {
 
 function getMessageTypeDisplay(type) {
   const types = {
+    'NAVIGATION_REQUEST': '🛤️ Прокладка маршрута',
     'UPGRADE_REQUEST': '🏗️ Постройка улучшения',
     'CRISIS_RESPONSE': '🚨 Решение кризиса',
-    'ROUTE_REQUEST': '🛤️ Прокладка маршрута',
-    'STATUS_UPDATE': '📊 Статус выполнения',
-    'REPORT': '📋 Отчет'
+    'RESOURCES_TRANSFER': '💰 Передача ресурсов',
+    'STATUS_UPDATE': '📊 Статус выполнения'
   };
   return types[type] || type;
 }
@@ -2574,7 +2735,7 @@ function App() {
         }
         
         .form-group label {
-          color: #aaa;
+          color: '#aaa';
           font-size: 14px;
         }
         
